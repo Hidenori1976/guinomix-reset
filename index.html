@@ -16,14 +16,14 @@
     }
 
     .container {
-  text-align: center;
-  background: transparent; /* 背景を透明化 */
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-  width: 360px;
-  margin: 0 auto;
-}
+      text-align: center;
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      box-shadow: none;
+      width: 360px;
+      margin: 0 auto;
+    }
 
     h2 {
       margin-bottom: 10px;
@@ -80,21 +80,22 @@
     <p id="textResult"></p>
   </div>
 
-  <!-- Supabase を通常の script で読み込む -->
+  <!-- Supabase JS v2 を読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const { createClient } = supabase;
-
     const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ✅ グローバルの supabase から client を作る
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const passwordInput = document.getElementById("inputNewPassword");
     const button = document.getElementById("buttonChangePassword");
     const resultEl = document.getElementById("textResult");
 
-    // ページ読み込み時：code をセッションに交換
+    // -----------------------
+    // 1) ページ読み込み時：code をセッションに交換
+    // -----------------------
     async function init() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
@@ -110,28 +111,25 @@
       resultEl.style.color = "#444";
       resultEl.textContent = "リンクを確認しています…";
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      // ✅ ここも client.auth を使う
+      const { error } = await client.auth.exchangeCodeForSession(code);
 
-if (error) {
-  console.error(error);
-  resultEl.style.color = "red";
-  // 🔽 エラーメッセージも一緒に出す
-  resultEl.textContent =
-    "リンクが無効です: " + (error.message || "原因不明のエラーです");
-  button.disabled = true;
-  return;
-} else {
-  // ここまで来ていたら code 自体は正常
-  resultEl.style.color = "#444";
-  resultEl.textContent = "認証コードを確認しました。新しいパスワードを入力してください。";
-}
+      if (error) {
+        console.error(error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクが無効です: " + (error.message || "原因不明のエラーです");
+        button.disabled = true;
+        return;
+      }
 
-      // セッションOK
       resultEl.style.color = "#444";
-      resultEl.textContent = "";
+      resultEl.textContent = "認証コードを確認しました。新しいパスワードを入力してください。";
     }
 
-    // ボタン押下 → パスワード更新
+    // -----------------------
+    // 2) ボタン押下 → パスワード更新
+    // -----------------------
     button.addEventListener("click", async () => {
       const newPassword = passwordInput.value.trim();
 
@@ -148,6 +146,7 @@ if (error) {
       resultEl.style.color = "#444";
       resultEl.textContent = "パスワードを更新しています…";
 
+      // ✅ ここも client.auth
       const { error } = await client.auth.updateUser({ password: newPassword });
 
       if (error) {
