@@ -79,33 +79,44 @@
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
+  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  const passwordInput = document.getElementById("newPassword");
+  const button = document.getElementById("resetBtn");
   const result = document.getElementById("result");
 
-  // URL から code を取得
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get("code");
+  // -----------------------
+  // 1) PKCE code をセッションに交換
+  // -----------------------
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
 
-  // ページロード時にセッション交換
-  if (!code) {
-    result.style.color = "red";
-    result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
-    document.getElementById("resetBtn").disabled = true;
-  } else {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
+    if (!code) {
       result.style.color = "red";
-      result.textContent = "セッションエラー：リンクが無効か期限切れです。";
-      document.getElementById("resetBtn").disabled = true;
+      result.textContent = "リンクが無効です。メールを再送してください。";
+      button.disabled = true;
+      return;
+    }
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error(error);
+      result.style.color = "red";
+      result.textContent = "リンクが無効です。メールを再送してください。";
+      button.disabled = true;
+      return;
     }
   }
 
-  // パスワード更新
-  document.getElementById("resetBtn").onclick = async () => {
-    const newPassword = document.getElementById("newPassword").value;
+  // -----------------------
+  // 2) パスワード更新
+  // -----------------------
+  button.onclick = async () => {
+    const newPassword = passwordInput.value;
 
     if (!newPassword) {
       result.style.color = "red";
@@ -116,16 +127,22 @@
     result.style.color = "#444";
     result.textContent = "パスワードを更新しています…";
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
 
     if (error) {
+      console.error(error);
       result.style.color = "red";
-      result.textContent = "更新エラー：リンクが無効か期限切れです。";
-    } else {
-      result.style.color = "green";
-      result.textContent = "パスワードが更新されました！アプリでログインできます。";
+      result.textContent = "エラー。リンクが無効な可能性があります。";
+      return;
     }
+
+    result.style.color = "green";
+    result.textContent = "パスワードを更新しました！アプリでログインできます。";
   };
+
+  init();
 </script>
 
 </body>
