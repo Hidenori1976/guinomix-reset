@@ -79,103 +79,78 @@
     <p id="textResult"></p>
   </div>
 
-  <!-- Supabase JS v2 を CDN から読み込み -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
+<script type="module">
+  import { createClient } from "https://esm.run/@supabase/supabase-js@2";
 
-    const passwordInput = document.getElementById("inputNewPassword");
-    const changeButton = document.getElementById("buttonChangePassword");
-    const resultEl = document.getElementById("textResult");
+  // ★ここは今のファイルに書いてある値をコピペしてください
+  const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_〇〇〇…";
 
-    const supabaseClient = supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let sessionReady = false;
+  const form = document.getElementById("resetForm");
+  const passwordInput = document.getElementById("password");
+  const resultEl = document.getElementById("result");
 
-    // ① メールリンクの code をセッションに変換
-    async function initFromCode() {
-      resultEl.textContent = "";
+  // 画面読み込み時に、code をセッションに交換する
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
 
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-
-      if (!code) {
-        resultEl.style.color = "red";
-        resultEl.textContent =
-          "リンクが無効です。もう一度メールを受け取ってください。";
-        changeButton.disabled = true;
-        return;
-      }
-
-      changeButton.disabled = true;
-      changeButton.textContent = "読み込み中...";
-
-      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(
-        code
-      );
-
-      if (error) {
-        console.error("exchangeCodeForSession error:", error);
-        resultEl.style.color = "red";
-        resultEl.textContent =
-          "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
-        changeButton.disabled = true;
-        changeButton.textContent = "パスワードを変更";
-        return;
-      }
-
-      // セッション取得成功
-      sessionReady = true;
-      changeButton.disabled = false;
-      changeButton.textContent = "パスワードを変更";
+    if (!code) {
+      // code が無い → そもそも無効リンク
+      resultEl.style.color = "red";
+      resultEl.textContent =
+        "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+      form.querySelector("button").disabled = true;
+      return;
     }
 
-    // ② ボタン押下でパスワード更新
-    changeButton.addEventListener("click", async () => {
-      resultEl.textContent = "";
+    // code を Supabase に渡して、セッションを作ってもらう
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-      if (!sessionReady) {
-        resultEl.style.color = "red";
-        resultEl.textContent =
-          "リンクの読み込み中です。数秒待ってからもう一度お試しください。";
-        return;
-      }
+    if (error) {
+      console.error("exchangeCodeForSession error:", error);
+      resultEl.style.color = "red";
+      resultEl.textContent =
+        "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+      form.querySelector("button").disabled = true;
+      return;
+    }
 
-      const newPassword = passwordInput.value.trim();
-      if (newPassword.length < 6) {
-        resultEl.style.color = "red";
-        resultEl.textContent = "パスワードは6文字以上で入力してください。";
-        return;
-      }
+    // ここまで来たら「このタブ内でだけ有効なログイン状態」になってる
+  }
 
-      changeButton.disabled = true;
-      changeButton.textContent = "更新中...";
+  // パスワード変更ボタンが押されたとき
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const { data, error } = await supabaseClient.auth.updateUser({
-        password: newPassword,
-      });
+    const newPassword = passwordInput.value.trim();
 
-      if (error) {
-        console.error("updateUser error:", error);
-        resultEl.style.color = "red";
-        resultEl.textContent =
-          "パスワードの更新に失敗しました。リンクが無効な可能性があります。";
-      } else {
-        resultEl.style.color = "green";
-        resultEl.textContent =
-          "パスワードを更新しました。アプリで新しいパスワードでログインしてください。";
-      }
+    if (!newPassword) {
+      resultEl.style.color = "red";
+      resultEl.textContent = "新しいパスワードを入力してください。";
+      return;
+    }
 
-      changeButton.disabled = false;
-      changeButton.textContent = "パスワードを変更";
-    });
+    resultEl.style.color = "#333";
+    resultEl.textContent = "パスワードを更新しています…";
 
-    window.addEventListener("load", initFromCode);
-  </script>
-</body>
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (error) {
+      console.error("updateUser error:", error);
+      resultEl.style.color = "red";
+      resultEl.textContent =
+        "パスワードの更新に失敗しました。リンクが無効になっている可能性があります。";
+      return;
+    }
+
+    resultEl.style.color = "green";
+    resultEl.textContent =
+      "パスワードを更新しました。アプリで新しいパスワードを使ってログインしてください。";
+  });
+
+  init();
+</script>
 </html>
