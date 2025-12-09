@@ -78,78 +78,76 @@
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  // --- Supabase 設定 ---
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7021s2WT";
+  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7021sZWT";
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // --- URL の ?code=... を取る ---
-  function getCodeFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("code");
+  // 画面上のパーツを拾う（ID関係なく動くようにしてある）
+  const passwordInput = document.querySelector('input[type="password"]');
+  const button = document.querySelector('button');
+  const resultEl =
+    document.getElementById('resultText') ||
+    document.querySelector('.result');
+
+  // 便利関数：メッセージ表示
+  function showMessage(text, color = '#666') {
+    if (!resultEl) return;
+    resultEl.style.color = color;
+    resultEl.textContent = text;
   }
 
-  // --- DOM 取得 ---
-  const inputNewPassword = document.getElementById("inputNewPassword");
-  const buttonChangePassword = document.getElementById("buttonChangePassword");
-  const textResult = document.getElementById("textResult");
+  // URL から ?code=xxx を取得（Supabase から渡される認可コード）
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('code');
 
-  buttonChangePassword.addEventListener("click", async () => {
-    textResult.style.color = "#555";
-    textResult.textContent = "処理中です…";
+  // code が無い＝古いリンクを開いているか URL が壊れている
+  if (!code) {
+    showMessage('リンクが無効です。もう一度メールを受け取ってください。', 'red');
+    if (button) button.disabled = true;
+  }
 
-    const newPassword = (inputNewPassword.value || "").trim();
+  // ボタンクリックで処理開始
+  if (button && passwordInput && code) {
+    button.addEventListener('click', async () => {
+      const newPassword = passwordInput.value.trim();
 
-    if (!newPassword) {
-      textResult.style.color = "red";
-      textResult.textContent = "新しいパスワードを入力してください。";
-      return;
-    }
-
-    const code = getCodeFromURL();
-    if (!code) {
-      textResult.style.color = "red";
-      textResult.textContent =
-        "リンクが無効です。もう一度メールを受け取ってください。";
-      return;
-    }
-
-    try {
-      // 1) code → セッションに交換
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.exchangeCodeForSession(code);
-
-      if (sessionError) {
-        console.error(sessionError);
-        textResult.style.color = "red";
-        textResult.textContent =
-          "リンクの有効期限が切れている可能性があります。もう一度メールを受け取ってください。";
+      if (!newPassword) {
+        showMessage('新しいパスワードを入力してください。', 'red');
         return;
       }
 
-      // 2) パスワード更新
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = '変更中…';
+      showMessage('パスワードを更新しています…');
+
+      // ① code → セッションに交換
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (error) {
+        console.error(error);
+        showMessage('リンクの有効期限が切れている可能性があります。もう一度メールを受け取ってください。', 'red');
+        button.disabled = false;
+        button.textContent = originalText;
+        return;
+      }
+
+      // ② パスワードを更新
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
       if (updateError) {
         console.error(updateError);
-        textResult.style.color = "red";
-        textResult.textContent =
-          "パスワードの更新に失敗しました。時間をおいてもう一度お試しください。";
-        return;
+        showMessage('パスワードの更新に失敗しました。もう一度お試しください。', 'red');
+      } else {
+        showMessage('パスワードを変更しました。アプリで再ログインしてください。', 'green');
+        passwordInput.value = '';
       }
 
-      textResult.style.color = "green";
-      textResult.textContent =
-        "パスワードを更新しました。アプリで新しいパスワードでログインしてください。";
-      inputNewPassword.value = "";
-    } catch (err) {
-      console.error(err);
-      textResult.style.color = "red";
-      textResult.textContent =
-        "通信エラーが発生しました。時間をおいてもう一度お試しください。";
-    }
-  });
+      button.disabled = false;
+      button.textContent = originalText;
+    });
+  }
 </script>
