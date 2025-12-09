@@ -18,9 +18,9 @@
     .container {
       text-align: center;
       background: white;
-      padding: 32px 30px;
-      border-radius: 16px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       width: 360px;
     }
 
@@ -38,42 +38,35 @@
 
     input[type="password"] {
       width: 100%;
-      padding: 12px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-sizing: border-box;
-      outline: none;
+      padding: 10px 12px;
       margin-bottom: 16px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    input[type="password"]:focus {
-      border-color: #007aff;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      box-sizing: border-box;
     }
 
     button {
       width: 100%;
-      padding: 12px;
-      font-size: 15px;
+      padding: 10px 12px;
       border: none;
-      border-radius: 8px;
-      background-color: #007aff;
+      border-radius: 6px;
+      background-color: #007aff; /* Appleっぽい青 */
       color: white;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.05s;
     }
 
-    button:active {
-      transform: translateY(1px);
-      background-color: #0062cc;
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
     }
 
-    #resultText {
+    #textResult {
       margin-top: 16px;
       font-size: 13px;
+      min-height: 1.2em;
     }
   </style>
 </head>
@@ -81,96 +74,108 @@
   <div class="container">
     <h2>GUINO MIX パスワード再設定</h2>
     <p>新しいパスワードを入力してください。</p>
-    <input
-      id="newPassword"
-      type="password"
-      placeholder="新しいパスワード"
-    />
-    <button id="changePasswordButton">パスワードを変更</button>
-    <p id="resultText"></p>
+    <input type="password" id="inputNewPassword" placeholder="新しいパスワード" />
+    <button id="buttonChangePassword">パスワードを変更</button>
+    <p id="textResult"></p>
   </div>
 
-  <!-- Supabase-js を使ったパスワード更新ロジック -->
-  <script type="module">
-    import { createClient } from 'https://esm.run/@supabase/supabase-js@2';
+  <!-- Supabase JS v2 を CDN から読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
+    const SUPABASE_ANON_KEY =
+      "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-    // ★ここは今までと同じ Supabase プロジェクトの URL と anon key
-    const SUPABASE_URL = 'https://xbypvxbzsioszshipomas.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_BtqbhbNYPQB0gbzmDW4-8g_7021s2WT';
+    const passwordInput = document.getElementById("inputNewPassword");
+    const changeButton = document.getElementById("buttonChangePassword");
+    const resultEl = document.getElementById("textResult");
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const passwordInput = document.getElementById('newPassword');
-    const button = document.getElementById('changePasswordButton');
-    const resultEl = document.getElementById('resultText');
+    const supabaseClient = supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
 
     let sessionReady = false;
 
-    // URL の ?code= を使って Supabase セッションを作る（PKCE 用）
-    async function prepareSessionFromCode() {
+    // ① メールリンクの code をセッションに変換
+    async function initFromCode() {
+      resultEl.textContent = "";
+
       const url = new URL(window.location.href);
-      const code = url.searchParams.get('code');
+      const code = url.searchParams.get("code");
 
       if (!code) {
-        resultEl.style.color = 'red';
-        resultEl.textContent = 'リンクが無効です。もう一度メールを受け取ってください。';
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクが無効です。もう一度メールを受け取ってください。";
+        changeButton.disabled = true;
         return;
       }
 
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      changeButton.disabled = true;
+      changeButton.textContent = "読み込み中...";
+
+      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(
+        code
+      );
 
       if (error) {
-        console.error('exchangeCodeForSession error:', error);
-        resultEl.style.color = 'red';
-        resultEl.textContent = 'リンクが無効か、有効期限が切れています。もう一度メールを受け取ってください。';
+        console.error("exchangeCodeForSession error:", error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+        changeButton.disabled = true;
+        changeButton.textContent = "パスワードを変更";
         return;
       }
 
-      // URL から code を消しておく（再読み込み時の誤動作防止）
-      url.searchParams.delete('code');
-      window.history.replaceState({}, '', url.toString());
-
+      // セッション取得成功
       sessionReady = true;
+      changeButton.disabled = false;
+      changeButton.textContent = "パスワードを変更";
     }
 
-    // ボタンクリックでパスワード更新
-    button.addEventListener('click', async () => {
-      resultEl.textContent = '';
+    // ② ボタン押下でパスワード更新
+    changeButton.addEventListener("click", async () => {
+      resultEl.textContent = "";
 
-      const newPassword = passwordInput.value.trim();
-
-      if (!newPassword) {
-        resultEl.style.color = 'red';
-        resultEl.textContent = '新しいパスワードを入力してください。';
+      if (!sessionReady) {
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクの読み込み中です。数秒待ってからもう一度お試しください。";
         return;
       }
 
-      // まだセッションが準備されていなければ、ここで作る
-      if (!sessionReady) {
-        await prepareSessionFromCode();
-        if (!sessionReady) return; // セッション作成に失敗したらここで終了
+      const newPassword = passwordInput.value.trim();
+      if (newPassword.length < 6) {
+        resultEl.style.color = "red";
+        resultEl.textContent = "パスワードは6文字以上で入力してください。";
+        return;
       }
 
-      // Supabase にパスワード更新を依頼
-      const { data, error } = await supabase.auth.updateUser({
+      changeButton.disabled = true;
+      changeButton.textContent = "更新中...";
+
+      const { data, error } = await supabaseClient.auth.updateUser({
         password: newPassword,
       });
 
       if (error) {
-        console.error('updateUser error:', error);
-        resultEl.style.color = 'red';
+        console.error("updateUser error:", error);
+        resultEl.style.color = "red";
         resultEl.textContent =
-          'パスワードの更新に失敗しました。リンクが無効の可能性があります。';
-        return;
+          "パスワードの更新に失敗しました。リンクが無効な可能性があります。";
+      } else {
+        resultEl.style.color = "green";
+        resultEl.textContent =
+          "パスワードを更新しました。アプリで新しいパスワードでログインしてください。";
       }
 
-      resultEl.style.color = 'green';
-      resultEl.textContent =
-        'パスワードを更新しました。アプリで新しいパスワードでログインしてください。';
+      changeButton.disabled = false;
+      changeButton.textContent = "パスワードを変更";
     });
 
-    // ページ表示時に先にセッションだけ作っておく（1回目のアクセス時）
-    prepareSessionFromCode();
+    window.addEventListener("load", initFromCode);
   </script>
 </body>
 </html>
