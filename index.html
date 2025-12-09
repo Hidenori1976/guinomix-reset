@@ -75,56 +75,81 @@
   <div id="result"></div>
 </div>
 
-<script>
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  // --- Supabase 設定 ---
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_pubishable_BtqbhbNYP0qb02mDW4-8g_7O2is2WT";
+  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7021s2WT";
 
-  function getAccessToken() {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const params = new URLSearchParams(hash.substring(1));
-    return params.get("access_token");
+  // --- URL の ?code=... を取る ---
+  function getCodeFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("code");
   }
 
-  const token = getAccessToken();
-  const btn = document.getElementById("resetBtn");
-  const result = document.getElementById("result");
+  // --- DOM 取得 ---
+  const inputNewPassword = document.getElementById("inputNewPassword");
+  const buttonChangePassword = document.getElementById("buttonChangePassword");
+  const textResult = document.getElementById("textResult");
 
-  btn.onclick = async () => {
-    const newPassword = document.getElementById("newPassword").value;
+  buttonChangePassword.addEventListener("click", async () => {
+    textResult.style.color = "#555";
+    textResult.textContent = "処理中です…";
+
+    const newPassword = (inputNewPassword.value || "").trim();
 
     if (!newPassword) {
-      result.style.color = "red";
-      result.textContent = "パスワードを入力してください。";
+      textResult.style.color = "red";
+      textResult.textContent = "新しいパスワードを入力してください。";
       return;
     }
 
-    if (!token) {
-      result.style.color = "red";
-      result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
+    const code = getCodeFromURL();
+    if (!code) {
+      textResult.style.color = "red";
+      textResult.textContent =
+        "リンクが無効です。もう一度メールを受け取ってください。";
       return;
     }
 
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: "PUT",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ password: newPassword })
-    });
+    try {
+      // 1) code → セッションに交換
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.exchangeCodeForSession(code);
 
-    if (res.ok) {
-      result.style.color = "green";
-      result.textContent = "パスワードが更新されました。アプリでログインできます。";
-    } else {
-      result.style.color = "red";
-      result.textContent = "処理に失敗しました。リンクが無効か再発行が必要です。";
+      if (sessionError) {
+        console.error(sessionError);
+        textResult.style.color = "red";
+        textResult.textContent =
+          "リンクの有効期限が切れている可能性があります。もう一度メールを受け取ってください。";
+        return;
+      }
+
+      // 2) パスワード更新
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        console.error(updateError);
+        textResult.style.color = "red";
+        textResult.textContent =
+          "パスワードの更新に失敗しました。時間をおいてもう一度お試しください。";
+        return;
+      }
+
+      textResult.style.color = "green";
+      textResult.textContent =
+        "パスワードを更新しました。アプリで新しいパスワードでログインしてください。";
+      inputNewPassword.value = "";
+    } catch (err) {
+      console.error(err);
+      textResult.style.color = "red";
+      textResult.textContent =
+        "通信エラーが発生しました。時間をおいてもう一度お試しください。";
     }
-  };
+  });
 </script>
-
-</body>
-</html>
