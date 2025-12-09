@@ -79,18 +79,18 @@
     <p id="textResult"></p>
   </div>
 
-<script type="module">
-  // ✅ ここを esm.run じゃなく jsDelivr に変更
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
+  <!-- Supabase のブラウザ用スクリプトを読み込む -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // グローバルの supabase オブジェクトから createClient を使う
+  const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const passwordInput = document.getElementById("inputNewPassword");
-  const button = document.getElementById("buttonChangePassword");
-  const resultEl = document.getElementById("textResult");
+  const button        = document.getElementById("buttonChangePassword");
+  const resultEl      = document.getElementById("textResult");
 
   // 1) ページ読み込み時：URL の code をチェックしてセッション交換
   async function init() {
@@ -105,7 +105,7 @@
       return;
     }
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supa.auth.exchangeCodeForSession(code);
 
     if (error) {
       console.error(error);
@@ -117,7 +117,7 @@
     }
   }
 
-  // 2) ボタンを押したとき：パスワード更新
+  // 2) ボタン押下：パスワード更新
   button.addEventListener("click", async () => {
     const newPassword = passwordInput.value.trim();
 
@@ -127,11 +127,10 @@
       return;
     }
 
-    // ここまでは必ず動くので、「何も起きてない」かどうかの目安になる
     resultEl.style.color = "#444";
     resultEl.textContent = "パスワードを更新しています…";
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supa.auth.updateUser({ password: newPassword });
 
     if (error) {
       console.error(error);
@@ -147,4 +146,5 @@
 
   init();
 </script>
+
 </html>
