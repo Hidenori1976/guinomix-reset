@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GUINO MIX パスワード再設定</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      color: #111;
+    }
+
+    .box {
+      width: 90%;
+      max-width: 360px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    p.desc {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 16px;
+      outline: none;
+      transition: 0.2s;
+      margin-bottom: 16px;
+    }
+
+    input:focus {
+      border-color: #007aff;
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.2);
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #007aff;
+      color: white;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: #0063d6;
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <h1>GUINO MIX パスワード再設定</h1>
+    <p class="desc">新しいパスワードを入力してください。</p>
+
+    <input id="newPassword" type="password" placeholder="新しいパスワード" />
+
+    <button onclick="submitNewPassword()">パスワードを変更</button>
+
+    <p id="result"></p>
+  </div>
+
+  <script>
+    // -------------------------
+    // Supabase 設定
+    // -------------------------
+    const SUPABASE_URL = "https://xbypxvbzisozshiipomas.supabase.co";
+    const SUPABASE_ANON_KEY = "sb-publishable_BtqbhbNYPQ8gozmDW4-8g_7O2is2WT";
+
+    // URL の #access_token を取得
+    function getAccessToken() {
+      const hash = window.location.hash.replace("#", "");
+      if (!hash) return null;
+
+      const params = new URLSearchParams(hash);
+      return params.get("access_token");
+    }
+
+    // パスワード更新処理
+    async function submitNewPassword() {
+      const resultEl = document.getElementById("result");
+      const newPassword = document.getElementById("newPassword").value;
+      const token = getAccessToken();
+
+      if (!newPassword || newPassword.length < 6) {
+        resultEl.style.color = "red";
+        resultEl.textContent = "6文字以上で入力してください。";
+        return;
+      }
+
+      if (!token) {
+        resultEl.style.color = "red";
+        resultEl.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
+        return;
+      }
+
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ password: newPassword })
+      });
+
+      if (res.ok) {
+        resultEl.style.color = "green";
+        resultEl.textContent = "パスワードが更新されました！アプリでログインしてください。";
+      } else {
+        resultEl.style.color = "red";
+        resultEl.textContent = "更新に失敗しました。リンクが無効の可能性があります。";
+      }
+    }
+  </script>
+</body>
+</html>
