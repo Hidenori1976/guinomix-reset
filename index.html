@@ -14,117 +14,157 @@
       height: 100vh;
       margin: 0;
     }
+
     .container {
-    text-align: center;
-    background: transparent; /* 背景を透明化 */
-    padding: 0;               /* 内側の余白も消す */
-    border-radius: 0;         /* 角丸なし */
-    box-shadow: none;         /* 影なし */
-    width: 360px;             /* 入力とボタン幅は維持したいなら残す */
-    margin: 0 auto;           /* 中央揃え */
-}
+      text-align: center;
+      background: white;
+      padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      width: 360px;
+    }
+
     h2 {
       margin-bottom: 10px;
       font-size: 22px;
       font-weight: 600;
     }
+
     p {
       font-size: 14px;
       color: #555;
       margin-bottom: 20px;
     }
-    input {
-      width: 320px;
-      padding: 12px 14px;
-      font-size: 16px;
+
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      border-radius: 6px;
       border: 1px solid #ccc;
-      border-radius: 8px;
-      margin-bottom: 15px;
+      font-size: 14px;
       box-sizing: border-box;
     }
+
     button {
-      width: 320px;
-      padding: 12px 14px;
-      font-size: 16px;
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 6px;
       background-color: #007aff;
       color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+      font-size: 15px;
       font-weight: 600;
+      cursor: pointer;
     }
-    button:hover {
-      background-color: #0066d6;
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
     }
-    #result {
-      margin-top: 15px;
-      font-size: 14px;
-      height: 18px;
+
+    #textResult {
+      margin-top: 16px;
+      font-size: 13px;
+      min-height: 1.2em;
     }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h2>GUINO MIX パスワード再設定</h2>
+    <p>新しいパスワードを入力してください。</p>
+    <input type="password" id="inputNewPassword" placeholder="新しいパスワード" />
+    <button id="buttonChangePassword">パスワードを変更</button>
+    <p id="textResult"></p>
+  </div>
 
-<div class="container">
-  <h2>GUINO MIX パスワード再設定</h2>
-  <p>新しいパスワードを入力してください。</p>
+  <!-- Supabase を通常の script で読み込む -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const { createClient } = supabase;
 
-  <input id="newPassword" type="password" placeholder="新しいパスワード">
-  <button id="resetBtn">パスワードを変更</button>
+    const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-  <div id="result"></div>
-</div>
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-<script>
-  const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieXB2eGJzaXpvc2hoaXBvbWFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NTQyNDcsImV4cCI6MjA4MDUzMDI0N30.iuveDeARuNXKtJNqkGVfs2hBCYqJuHZih5rET-DGWno";
+    const passwordInput = document.getElementById("inputNewPassword");
+    const button = document.getElementById("buttonChangePassword");
+    const resultEl = document.getElementById("textResult");
 
-  function getAccessToken() {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return null;
+    // ページ読み込み時：code をセッションに交換
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
 
-    const params = new URLSearchParams(hash.substring(1));
-    return params.get("access_token");
-  }
+      if (!code) {
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+        button.disabled = true;
+        return;
+      }
 
-  const token = getAccessToken();
-  const btn = document.getElementById("resetBtn");
-  const result = document.getElementById("result");
+      resultEl.style.color = "#444";
+      resultEl.textContent = "リンクを確認しています…";
 
-  btn.onclick = async () => {
-    const newPassword = document.getElementById("newPassword").value;
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!newPassword) {
-      result.style.color = "red";
-      result.textContent = "パスワードを入力してください。";
-      return;
+if (error) {
+  console.error(error);
+  resultEl.style.color = "red";
+  // 🔽 エラーメッセージも一緒に出す
+  resultEl.textContent =
+    "リンクが無効です: " + (error.message || "原因不明のエラーです");
+  button.disabled = true;
+  return;
+} else {
+  // ここまで来ていたら code 自体は正常
+  resultEl.style.color = "#444";
+  resultEl.textContent = "認証コードを確認しました。新しいパスワードを入力してください。";
+}
+
+      // セッションOK
+      resultEl.style.color = "#444";
+      resultEl.textContent = "";
     }
 
-    if (!token) {
-      result.style.color = "red";
-      result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
-      return;
-    }
+    // ボタン押下 → パスワード更新
+    button.addEventListener("click", async () => {
+      const newPassword = passwordInput.value.trim();
 
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: "PUT",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ password: newPassword })
+      if (!newPassword) {
+        resultEl.style.color = "red";
+        resultEl.textContent = "新しいパスワードを入力してください。";
+        return;
+      }
+
+      button.disabled = true;
+      const originalLabel = button.textContent;
+      button.textContent = "更新中…";
+
+      resultEl.style.color = "#444";
+      resultEl.textContent = "パスワードを更新しています…";
+
+      const { error } = await client.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        console.error(error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "パスワードの更新に失敗しました: " + error.message;
+        button.disabled = false;
+        button.textContent = originalLabel;
+        return;
+      }
+
+      button.textContent = "完了";
+      resultEl.style.color = "green";
+      resultEl.textContent = "パスワードを更新しました！アプリでログインしてください。";
     });
 
-    if (res.ok) {
-      result.style.color = "green";
-      result.textContent = "パスワードが更新されました。アプリでログインできます。";
-    } else {
-      result.style.color = "red";
-      result.textContent = "処理に失敗しました。リンクが無効か再発行が必要です。";
-    }
-  };
-</script>
-
+    init();
+  </script>
 </body>
 </html>
