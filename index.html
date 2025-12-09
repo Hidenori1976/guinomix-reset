@@ -80,21 +80,19 @@
   </div>
 
 <script type="module">
-  import { createClient } from "https://esm.run/@supabase/supabase-js@2";
+  // ✅ ここを esm.run じゃなく jsDelivr に変更
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ★ HTML に合わせて id を修正
   const passwordInput = document.getElementById("inputNewPassword");
   const button = document.getElementById("buttonChangePassword");
   const resultEl = document.getElementById("textResult");
 
-  // -------------------------------
-  // 1) ページロード時：code をセッションに交換
-  // -------------------------------
+  // 1) ページ読み込み時：URL の code をチェックしてセッション交換
   async function init() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -119,9 +117,7 @@
     }
   }
 
-  // -------------------------------
-  // 2) ボタン押下：パスワード更新
-  // -------------------------------
+  // 2) ボタンを押したとき：パスワード更新
   button.addEventListener("click", async () => {
     const newPassword = passwordInput.value.trim();
 
@@ -131,6 +127,7 @@
       return;
     }
 
+    // ここまでは必ず動くので、「何も起きてない」かどうかの目安になる
     resultEl.style.color = "#444";
     resultEl.textContent = "パスワードを更新しています…";
 
@@ -145,7 +142,7 @@
     }
 
     resultEl.style.color = "green";
-    resultEl.textContent = "パスワードを更新しました！ログインしてください。";
+    resultEl.textContent = "パスワードを更新しました！アプリでログインしてください。";
   });
 
   init();
