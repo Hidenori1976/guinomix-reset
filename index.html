@@ -15,14 +15,14 @@
       margin: 0;
     }
     .container {
-      text-align: center;
-      background: transparent;
-      padding: 0;
-      border-radius: 0;
-      box-shadow: none;
-      width: 360px;
-      margin: 0 auto;
-    }
+    text-align: center;
+    background: transparent; /* 背景を透明化 */
+    padding: 0;               /* 内側の余白も消す */
+    border-radius: 0;         /* 角丸なし */
+    box-shadow: none;         /* 影なし */
+    width: 360px;             /* 入力とボタン幅は維持したいなら残す */
+    margin: 0 auto;           /* 中央揃え */
+}
     h2 {
       margin-bottom: 10px;
       font-size: 22px;
@@ -75,48 +75,24 @@
   <div id="result"></div>
 </div>
 
-<script type="module">
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
+<script>
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieXB2eGJzaXpvc2hoaXBvbWFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NTQyNDcsImV4cCI6MjA4MDUzMDI0N30.iuveDeARuNXKtJNqkGVfs2hBCYqJuHZih5rET-DGWno";
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  function getAccessToken() {
+    const hash = window.location.hash;
+    if (!hash.includes("access_token")) return null;
 
-  const passwordInput = document.getElementById("newPassword");
-  const button = document.getElementById("resetBtn");
-  const result = document.getElementById("result");
-
-  // -----------------------
-  // 1) PKCE code をセッションに交換
-  // -----------------------
-  async function init() {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-
-    if (!code) {
-      result.style.color = "red";
-      result.textContent = "リンクが無効です。メールを再送してください。";
-      button.disabled = true;
-      return;
-    }
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (error) {
-      console.error(error);
-      result.style.color = "red";
-      result.textContent = "リンクが無効です。メールを再送してください。";
-      button.disabled = true;
-      return;
-    }
+    const params = new URLSearchParams(hash.substring(1));
+    return params.get("access_token");
   }
 
-  // -----------------------
-  // 2) パスワード更新
-  // -----------------------
-  button.onclick = async () => {
-    const newPassword = passwordInput.value;
+  const token = getAccessToken();
+  const btn = document.getElementById("resetBtn");
+  const result = document.getElementById("result");
+
+  btn.onclick = async () => {
+    const newPassword = document.getElementById("newPassword").value;
 
     if (!newPassword) {
       result.style.color = "red";
@@ -124,25 +100,30 @@
       return;
     }
 
-    result.style.color = "#444";
-    result.textContent = "パスワードを更新しています…";
-
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
-    if (error) {
-      console.error(error);
+    if (!token) {
       result.style.color = "red";
-      result.textContent = "エラー。リンクが無効な可能性があります。";
+      result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
       return;
     }
 
-    result.style.color = "green";
-    result.textContent = "パスワードを更新しました！アプリでログインできます。";
-  };
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ password: newPassword })
+    });
 
-  init();
+    if (res.ok) {
+      result.style.color = "green";
+      result.textContent = "パスワードが更新されました。アプリでログインできます。";
+    } else {
+      result.style.color = "red";
+      result.textContent = "処理に失敗しました。リンクが無効か再発行が必要です。";
+    }
+  };
 </script>
 
 </body>
