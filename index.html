@@ -92,22 +92,19 @@
     const button = document.getElementById("buttonChangePassword");
     const resultEl = document.getElementById("textResult");
 
-    // -----------------------
-    // 1) URLハッシュからトークン取り出し→セッション確立
-    // -----------------------
+    // ------------- 1) ハッシュから token / email / type を取得 -------------
+    let globalEmail = null;
+    let globalToken = null;
+
     async function init() {
       const hash = window.location.hash || "";
       const params = new URLSearchParams(hash.startsWith("#") ? hash.substring(1) : hash);
 
-      const accessToken  = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-      const type         = params.get("type");
+      const token = params.get("token");
+      const email = params.get("email");
+      const type  = params.get("type");
 
-      console.log("hash params:", {
-        accessToken: accessToken ? accessToken.slice(0, 10) + "..." : null,
-        refreshToken: refreshToken ? refreshToken.slice(0, 10) + "..." : null,
-        type
-      });
+      console.log("hash params:", { token, email, type });
 
       if (type !== "recovery") {
         resultEl.style.color = "red";
@@ -117,40 +114,43 @@
         return;
       }
 
-      if (!accessToken || !refreshToken) {
+      if (!token || !email) {
         resultEl.style.color = "red";
         resultEl.textContent =
-          "無効なリンクです（トークン不足）。もう一度メールを受け取ってください。";
+          "無効なリンクです（token または email が不足しています）。もう一度メールを受け取ってください。";
         button.disabled = true;
         return;
       }
+
+      globalEmail = email;
+      globalToken = token;
 
       resultEl.style.color = "#444";
       resultEl.textContent = "リンクを確認しています…";
 
-      // ★ ここでセッションをセット（access_token & refresh_token 両方必須）
-      const { data, error } = await client.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
+      // ------------- 2) verifyOtp でセッションを確立 -------------
+      const { data, error } = await client.auth.verifyOtp({
+        type: "recovery",
+        email,
+        token
       });
 
       if (error) {
-        console.error("setSession error:", error);
+        console.error("verifyOtp error:", error);
         resultEl.style.color = "red";
         resultEl.textContent =
-          "セッションの確立に失敗しました: " + (error.message || "原因不明のエラーです");
+          "セッションの確立に失敗しました。リンクが無効か、再発行が必要です。（詳細: " +
+          (error.message || "不明なエラー") + "）";
         button.disabled = true;
         return;
       }
 
-      console.log("session set:", data);
+      console.log("verifyOtp success:", data);
       resultEl.style.color = "#444";
       resultEl.textContent = "認証が完了しました。新しいパスワードを入力してください。";
     }
 
-    // -----------------------
-    // 2) パスワード更新
-    // -----------------------
+    // ------------- 3) パスワード更新 -------------
     button.addEventListener("click", async () => {
       const newPassword = passwordInput.value.trim();
 
