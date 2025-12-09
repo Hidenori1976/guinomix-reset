@@ -80,40 +80,77 @@
     <p id="textResult"></p>
   </div>
 
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieXB2eGJzaXpvc2hoaXBvbWFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NTQyNDcsImV4cCI6MjA4MDUzMDI0N30.iuveDeARuNXKtJNqkGVfs2hBCYqJuHZih5rET-DGWno";
+    const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const passwordInput = document.getElementById("inputNewPassword");
     const button = document.getElementById("buttonChangePassword");
     const resultEl = document.getElementById("textResult");
 
-    // URL の #access_token=... を取り出す
-    function getAccessTokenFromHash() {
+    // -----------------------
+    // 1) URLハッシュからトークン取り出し→セッション確立
+    // -----------------------
+    async function init() {
       const hash = window.location.hash || "";
-      if (!hash.startsWith("#")) return null;
-      const params = new URLSearchParams(hash.slice(1));
-      return params.get("access_token");
-    }
+      const params = new URLSearchParams(hash.startsWith("#") ? hash.substring(1) : hash);
 
-    const accessToken = getAccessTokenFromHash();
+      const accessToken  = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      const type         = params.get("type");
 
-    // ページ読み込み時：トークンをチェック
-    (function init() {
-      if (!accessToken) {
+      console.log("hash params:", {
+        accessToken: accessToken ? accessToken.slice(0, 10) + "..." : null,
+        refreshToken: refreshToken ? refreshToken.slice(0, 10) + "..." : null,
+        type
+      });
+
+      if (type !== "recovery") {
         resultEl.style.color = "red";
         resultEl.textContent =
-          "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+          "無効なリンクです（type が recovery ではありません）。もう一度メールを受け取ってください。";
+        button.disabled = true;
+        return;
+      }
+
+      if (!accessToken || !refreshToken) {
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "無効なリンクです（トークン不足）。もう一度メールを受け取ってください。";
         button.disabled = true;
         return;
       }
 
       resultEl.style.color = "#444";
-      resultEl.textContent = "新しいパスワードを入力して更新してください。";
-    })();
+      resultEl.textContent = "リンクを確認しています…";
 
-    // ボタン押下 → パスワード更新
+      // ★ ここでセッションをセット（access_token & refresh_token 両方必須）
+      const { data, error } = await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        console.error("setSession error:", error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "セッションの確立に失敗しました: " + (error.message || "原因不明のエラーです");
+        button.disabled = true;
+        return;
+      }
+
+      console.log("session set:", data);
+      resultEl.style.color = "#444";
+      resultEl.textContent = "認証が完了しました。新しいパスワードを入力してください。";
+    }
+
+    // -----------------------
+    // 2) パスワード更新
+    // -----------------------
     button.addEventListener("click", async () => {
       const newPassword = passwordInput.value.trim();
 
@@ -123,54 +160,34 @@
         return;
       }
 
-      if (!accessToken) {
-        resultEl.style.color = "red";
-        resultEl.textContent =
-          "リンクが無効です。もう一度メールを受け取ってください。";
-        return;
-      }
-
       button.disabled = true;
       const originalLabel = button.textContent;
       button.textContent = "更新中…";
+
       resultEl.style.color = "#444";
       resultEl.textContent = "パスワードを更新しています…";
 
-      try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-          method: "PUT",
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ password: newPassword }),
-        });
+      const { data, error } = await client.auth.updateUser({ password: newPassword });
 
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          resultEl.style.color = "red";
-          resultEl.textContent =
-            "処理に失敗しました。リンクが無効か、再発行が必要です。" +
-            (errText ? "（詳細: " + errText + "）" : "");
-          button.disabled = false;
-          button.textContent = originalLabel;
-          return;
-        }
-
-        button.textContent = "完了";
-        resultEl.style.color = "green";
-        resultEl.textContent =
-          "パスワードを更新しました！GUINO MIX アプリでログインしてください。";
-      } catch (e) {
-        console.error(e);
+      if (error) {
+        console.error("updateUser error:", error);
         resultEl.style.color = "red";
         resultEl.textContent =
-          "通信エラーが発生しました。時間をおいてもう一度お試しください。";
+          "処理に失敗しました。リンクが無効か、再発行が必要です。（詳細: " +
+          (error.message || "不明なエラー") +
+          "）";
         button.disabled = false;
         button.textContent = originalLabel;
+        return;
       }
+
+      console.log("password updated:", data);
+      button.textContent = "完了";
+      resultEl.style.color = "green";
+      resultEl.textContent = "パスワードを更新しました！ アプリでログインしてください。";
     });
+
+    init();
   </script>
 </body>
 </html>
