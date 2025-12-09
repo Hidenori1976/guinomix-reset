@@ -15,14 +15,14 @@
       margin: 0;
     }
     .container {
-    text-align: center;
-    background: transparent; /* 背景を透明化 */
-    padding: 0;               /* 内側の余白も消す */
-    border-radius: 0;         /* 角丸なし */
-    box-shadow: none;         /* 影なし */
-    width: 360px;             /* 入力とボタン幅は維持したいなら残す */
-    margin: 0 auto;           /* 中央揃え */
-}
+      text-align: center;
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      box-shadow: none;
+      width: 360px;
+      margin: 0 auto;
+    }
     h2 {
       margin-bottom: 10px;
       font-size: 22px;
@@ -75,23 +75,36 @@
   <div id="result"></div>
 </div>
 
-<script>
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
   const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhieXB2eGJzaXpvc2hoaXBvbWFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5NTQyNDcsImV4cCI6MjA4MDUzMDI0N30.iuveDeARuNXKtJNqkGVfs2hBCYqJuHZih5rET-DGWno";
+  const SUPABASE_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-  function getAccessToken() {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const params = new URLSearchParams(hash.substring(1));
-    return params.get("access_token");
-  }
-
-  const token = getAccessToken();
-  const btn = document.getElementById("resetBtn");
   const result = document.getElementById("result");
 
-  btn.onclick = async () => {
+  // URL から code を取得
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  // ページロード時にセッション交換
+  if (!code) {
+    result.style.color = "red";
+    result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
+    document.getElementById("resetBtn").disabled = true;
+  } else {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      result.style.color = "red";
+      result.textContent = "セッションエラー：リンクが無効か期限切れです。";
+      document.getElementById("resetBtn").disabled = true;
+    }
+  }
+
+  // パスワード更新
+  document.getElementById("resetBtn").onclick = async () => {
     const newPassword = document.getElementById("newPassword").value;
 
     if (!newPassword) {
@@ -100,28 +113,17 @@
       return;
     }
 
-    if (!token) {
+    result.style.color = "#444";
+    result.textContent = "パスワードを更新しています…";
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (error) {
       result.style.color = "red";
-      result.textContent = "リンクが無効です。もう一度メールを受け取ってください。";
-      return;
-    }
-
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      method: "PUT",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ password: newPassword })
-    });
-
-    if (res.ok) {
-      result.style.color = "green";
-      result.textContent = "パスワードが更新されました。アプリでログインできます。";
+      result.textContent = "更新エラー：リンクが無効か期限切れです。";
     } else {
-      result.style.color = "red";
-      result.textContent = "処理に失敗しました。リンクが無効か再発行が必要です。";
+      result.style.color = "green";
+      result.textContent = "パスワードが更新されました！アプリでログインできます。";
     }
   };
 </script>
