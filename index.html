@@ -51,7 +51,7 @@
       padding: 10px 12px;
       border: none;
       border-radius: 6px;
-      background-color: #007aff; /* Appleっぽい青 */
+      background-color: #007aff;
       color: white;
       font-size: 15px;
       font-weight: 600;
@@ -79,72 +79,87 @@
     <p id="textResult"></p>
   </div>
 
-  <!-- Supabase のブラウザ用スクリプトを読み込む -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
+  <!-- Supabase を通常の script で読み込む -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const { createClient } = supabase;
 
-  // グローバルの supabase オブジェクトから createClient を使う
-  const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = "https://xbypvxbsizoshhipomas.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_BtqbhbNYPQBgobzmDW4-8g_7O2is2WI";
 
-  const passwordInput = document.getElementById("inputNewPassword");
-  const button        = document.getElementById("buttonChangePassword");
-  const resultEl      = document.getElementById("textResult");
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 1) ページ読み込み時：URL の code をチェックしてセッション交換
-  async function init() {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
+    const passwordInput = document.getElementById("inputNewPassword");
+    const button = document.getElementById("buttonChangePassword");
+    const resultEl = document.getElementById("textResult");
 
-    if (!code) {
-      resultEl.style.color = "red";
-      resultEl.textContent =
-        "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+    // ページ読み込み時：code をセッションに交換
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (!code) {
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクの有効期限が切れているか、無効なリンクです。もう一度メールを受け取ってください。";
+        button.disabled = true;
+        return;
+      }
+
+      resultEl.style.color = "#444";
+      resultEl.textContent = "リンクを確認しています…";
+
+      const { error } = await client.auth.exchangeCodeForSession(code);
+
+      if (error) {
+        console.error(error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "リンクが無効です。もう一度メールを受け取ってください。";
+        button.disabled = true;
+        return;
+      }
+
+      // セッションOK
+      resultEl.style.color = "#444";
+      resultEl.textContent = "";
+    }
+
+    // ボタン押下 → パスワード更新
+    button.addEventListener("click", async () => {
+      const newPassword = passwordInput.value.trim();
+
+      if (!newPassword) {
+        resultEl.style.color = "red";
+        resultEl.textContent = "新しいパスワードを入力してください。";
+        return;
+      }
+
       button.disabled = true;
-      return;
-    }
+      const originalLabel = button.textContent;
+      button.textContent = "更新中…";
 
-    const { error } = await supa.auth.exchangeCodeForSession(code);
+      resultEl.style.color = "#444";
+      resultEl.textContent = "パスワードを更新しています…";
 
-    if (error) {
-      console.error(error);
-      resultEl.style.color = "red";
-      resultEl.textContent =
-        "リンクが無効です。もう一度メールを受け取ってください。";
-      button.disabled = true;
-      return;
-    }
-  }
+      const { error } = await client.auth.updateUser({ password: newPassword });
 
-  // 2) ボタン押下：パスワード更新
-  button.addEventListener("click", async () => {
-    const newPassword = passwordInput.value.trim();
+      if (error) {
+        console.error(error);
+        resultEl.style.color = "red";
+        resultEl.textContent =
+          "パスワードの更新に失敗しました: " + error.message;
+        button.disabled = false;
+        button.textContent = originalLabel;
+        return;
+      }
 
-    if (!newPassword) {
-      resultEl.style.color = "red";
-      resultEl.textContent = "新しいパスワードを入力してください。";
-      return;
-    }
+      button.textContent = "完了";
+      resultEl.style.color = "green";
+      resultEl.textContent = "パスワードを更新しました！アプリでログインしてください。";
+    });
 
-    resultEl.style.color = "#444";
-    resultEl.textContent = "パスワードを更新しています…";
-
-    const { error } = await supa.auth.updateUser({ password: newPassword });
-
-    if (error) {
-      console.error(error);
-      resultEl.style.color = "red";
-      resultEl.textContent =
-        "パスワードの更新に失敗しました。リンクが無効になっている可能性があります。";
-      return;
-    }
-
-    resultEl.style.color = "green";
-    resultEl.textContent = "パスワードを更新しました！アプリでログインしてください。";
-  });
-
-  init();
-</script>
-
+    init();
+  </script>
+</body>
 </html>
